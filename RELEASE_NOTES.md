@@ -1,3 +1,7 @@
+### 99.0.0-intellifactory - 08.06.2016
+
+* (Very minimal) support for inserting relations in SQLite.
+
 ### 1.0.12 - 01.06.2016
 * Odbc fixed (on some level).
 * SQLite fix for reserved keywords table names.

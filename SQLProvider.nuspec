@@ -5,7 +5,7 @@
     <version>@build.number@</version>
     <authors>@authors@</authors>
     <owners>@authors@</owners>
-    <licenseUrl>http://github.com/fsprojects/SQLProvider/blob/master/LICENSE.md</licenseUrl>
+    <licenseUrl>http://github.com/tarmil/SQLProvider/blob/master/LICENSE.md</licenseUrl>
     <projectUrl>http://fsprojects.github.io/SQLProvider</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <summary>@summary@</summary>

@@ -23,15 +23,15 @@ open System.IO
 // The name of the project
 // (used by attributes in AssemblyInfo, name of a NuGet package and directory in 'src')
 
-let project = "SQLProvider"
+let project = "IntelliFactory.SQLProvider"
 
 // Short summary of the project
 // (used as description in AssemblyInfo and as a short summary for NuGet package)
-let summary = "Type providers for SQL database access."
+let summary = "Type providers for SQL database access (IntelliFactory fork)."
 
 // Longer description of the project
 // (used as a description for NuGet package; line breaks are automatically cleaned up)
-let description = "Type providers for SQL database access."
+let description = "Type providers for SQL database access (IntelliFactory fork)."
 
 // List of author names (for NuGet package)
 let authors = [ "Ross McKinlay, Colin Bull" ]
@@ -62,7 +62,7 @@ let release = parseReleaseNotes (IO.File.ReadAllLines "RELEASE_NOTES.md")
 
 // Generate assembly info files with the right version & up-to-date information
 Target "AssemblyInfo" (fun _ ->
-  let fileName = "src/" + project + "/AssemblyInfo.fs"
+  let fileName = "src/SQLProvider/AssemblyInfo.fs"
   CreateFSharpAssemblyInfo fileName
       [ Attribute.Title project
         Attribute.Product project
@@ -126,7 +126,7 @@ Target "NuGet" (fun _ ->
             AccessKey = getBuildParamOrDefault "nugetkey" ""
             Publish = hasBuildParam "nugetkey"
             Dependencies = [] })
-        (project + ".nuspec")
+        "SQLProvider.nuspec"
 
     CleanDir "Temp"
 )
