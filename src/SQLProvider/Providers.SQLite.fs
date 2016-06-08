@@ -82,7 +82,7 @@ type internal SQLiteProvider(resolutionPath, referencedAssemblies, runtimeAssemb
         findClrType <- clrMappings.TryFind
         findDbType <- dbMappings.TryFind
 
-    let createInsertCommand (con:IDbConnection) (sb:Text.StringBuilder) (entity:SqlEntity) =
+    let createInsertCommand (con:IDbConnection) (sb:Text.StringBuilder) (entity:SqlEntity) (ensureUpToDate: SqlEntity -> unit) =
         let (~~) (t:string) = sb.Append t |> ignore
 
         let cmd = (this :> ISqlProvider).CreateCommand(con,"")
@@ -91,6 +91,12 @@ type internal SQLiteProvider(resolutionPath, referencedAssemblies, runtimeAssemb
         let columnNames, values =
             (([],0),entity.ColumnValues)
             ||> Seq.fold(fun (out,i) (k,v) ->
+                let v =
+                    match v with
+                    | :? SqlForeignKeyRef<int64> as ref ->
+                        ensureUpToDate ref.OtherEntity
+                        box <| ref.GetValue()
+                    | _ -> v
                 let name = sprintf "@param%i" i
                 let p = (this :> ISqlProvider).CreateCommandParameter(QueryParameter.Create(name,i),v)
                 (k,p)::out,i+1)
@@ -479,11 +485,10 @@ type internal SQLiteProvider(resolutionPath, referencedAssemblies, runtimeAssemb
                 if con.State = ConnectionState.Open then con.Close()
                 con.Open()
                 // initially supporting update/create/delete of single entities, no hierarchies yet
-                entities.Keys
-                |> Seq.iter(fun e ->
+                let rec processEntity (e: SqlEntity) =
                     match e._State with
                     | Created ->
-                        use cmd = createInsertCommand con sb e
+                        use cmd = createInsertCommand con sb e processEntity
                         Common.QueryEvents.PublishSqlQuery cmd.CommandText
                         let id = cmd.ExecuteScalar()
                         checkKey id e
@@ -500,7 +505,9 @@ type internal SQLiteProvider(resolutionPath, referencedAssemblies, runtimeAssemb
                         // remove the pk to prevent this attempting to be used again
                         e.SetColumnOptionSilent(pkLookup.[e.Table.FullName], None)
                         e._State <- Deleted
-                    | Deleted | Unchanged -> failwith "Unchanged entity encountered in update list - this should not be possible!")
+                    | Unchanged -> () // already processed as dependency of another item
+                    | Deleted -> failwith "Deleted entity encountered in update list - this should not be possible!"
+                Seq.iter processEntity entities.Keys
                 scope.Complete()
 
             finally
@@ -529,7 +536,7 @@ type internal SQLiteProvider(resolutionPath, referencedAssemblies, runtimeAssemb
                         match e._State with
                         | Created ->
                             async {
-                                use cmd = createInsertCommand con sb e :?> System.Data.Common.DbCommand
+                                use cmd = createInsertCommand con sb e ignore (* TODO *) :?> System.Data.Common.DbCommand
                                 Common.QueryEvents.PublishSqlQuery cmd.CommandText
                                 let! id = cmd.ExecuteScalarAsync() |> Async.AwaitTask
                                 checkKey id e

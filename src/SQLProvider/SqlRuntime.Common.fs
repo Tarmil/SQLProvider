@@ -83,6 +83,7 @@ type SqlEntity(dc: ISqlDataContext, tableName, columns: ColumnLookup) =
            match data.[key] with
            | null -> defaultValue()
            | :? System.DBNull -> defaultValue()
+           | :? SqlForeignKeyRef<'T> as ref -> unbox<'T> (ref.GetValue())
             //This deals with an oracle specific case where the type mappings says it returns a System.Decimal but actually returns a float!?!?!  WTF...
            | data when data.GetType() <> typeof<'T> && typeof<'T> <> typeof<obj> -> unbox <| Convert.ChangeType(data, typeof<'T>)
            | data -> unbox data
@@ -93,6 +94,7 @@ type SqlEntity(dc: ISqlDataContext, tableName, columns: ColumnLookup) =
            match data.[key] with
            | null -> None
            | :? System.DBNull -> None
+           | :? SqlForeignKeyRef<'T> as ref -> Some (unbox<'T> (ref.GetValue()))
            | data when data.GetType() <> typeof<'T> && typeof<'T> <> typeof<obj> -> Some(unbox<'T> <| Convert.ChangeType(data, typeof<'T>))
            | data -> Some(unbox data)
        else None
@@ -118,6 +120,9 @@ type SqlEntity(dc: ISqlDataContext, tableName, columns: ColumnLookup) =
         data.[key] <- value
         e.UpdateField key
         e.TriggerPropertyChange key
+
+    member e.SetForeignKeyRef<'T>(foreignKey, otherEntity: SqlEntity, otherEntityKey) =
+        e.SetColumn(foreignKey, SqlForeignKeyRef<'T>(otherEntity, otherEntityKey))
 
     member e.SetData(data) = data |> Seq.iter e.SetColumnSilent
 
@@ -234,6 +239,11 @@ type SqlEntity(dc: ISqlDataContext, tableName, columns: ColumnLookup) =
                                  override __.ResetValue(_) = ()
                                  override __.ShouldSerializeValue(_) = false })
                |> Seq.cast<PropertyDescriptor> |> Seq.toArray )
+
+and SqlForeignKeyRef<'T> internal (otherEntity: SqlEntity, otherEntityKey: string) =
+    member this.GetValue() = otherEntity.GetColumn<'T>(otherEntityKey)
+    member this.OtherEntity = otherEntity
+    member this.OtherEntityKey = otherEntityKey
 
 and ResultSet = seq<(string * obj)[]>
 and ReturnSetType =

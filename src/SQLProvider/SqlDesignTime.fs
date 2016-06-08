@@ -229,14 +229,21 @@ type SqlTypeProvider(config: TypeProviderConfig) as this =
                         let ty = ty.MakeGenericType tt
                         let constraintName = r.Name
                         let niceName = getRelationshipName (sprintf "%s by %s" r.PrimaryTable r.PrimaryKey)
+                        let pt = r.PrimaryTable
+                        let pk = r.PrimaryKey
+                        let ft = r.ForeignTable
+                        let fk = r.ForeignKey
                         let prop = ProvidedProperty(niceName,ty,GetterCode = fun args -> 
-                            let pt = r.PrimaryTable
-                            let pk = r.PrimaryKey
-                            let ft = r.ForeignTable
-                            let fk = r.ForeignKey
                             <@@ (%%args.[0] : SqlEntity).DataContext.CreateRelated((%%args.[0] : SqlEntity),constraintName,pt,pk,ft,fk,RelationshipDirection.Parents) @@> )
                         prop.AddXmlDoc(sprintf "Related %s entities from the primary side of the relationship, where the primary key is %s and the foreign key is %s. Constraint: %s" r.PrimaryTable r.PrimaryKey r.ForeignKey constraintName)
-                        yield prop ]
+                        yield prop
+                        let setFK =
+                            let kTy = Type.GetType columns.[fk].TypeMapping.ClrType
+                            let m = typeof<SqlEntity>.GetMethod("SetForeignKeyRef").MakeGenericMethod(kTy)
+                            fun (args: Expr list) -> Expr.Call(args.[0], m, [ <@@ fk @@>; args.[1]; <@@ pk @@> ])
+                        let setProp = ProvidedProperty("Set " + niceName, typeof<SqlEntity>, SetterCode = setFK)
+                        setProp.AddXmlDoc(sprintf "Set the foreign key %s to the given entity's primary key %s. Currently only works if this entity is being inserted." fk pk)
+                        yield setProp ]
                 attProps @ relProps)
         
         let generateSprocMethod (container:ProvidedTypeDefinition) (con:IDbConnection) (sproc:CompileTimeSprocDefinition) =             
